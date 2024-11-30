@@ -1,0 +1,147 @@
+#include <Arduino.h>
+#include <Adafruit_Fingerprint.h>
+
+// ใช้ HardwareSerial สำหรับ ESP32
+HardwareSerial mySerial(1); // Serial1
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+
+// Prototype ของฟังก์ชัน
+void enrollFingerprint();
+uint8_t getFingerprintEnroll(uint8_t id);
+
+void setup() {
+  Serial.begin(9600); // Debug Serial
+  while (!Serial);  // รอให้ Serial พร้อมใช้งาน
+  delay(100);
+  Serial.println("\n\nAdafruit fingerprint enrollment example");
+
+  // กำหนดพอร์ต TX/RX สำหรับ Fingerprint Sensor
+  mySerial.begin(57600, SERIAL_8N1, 22, 23); // TX=22, RX=23
+
+  // เริ่มต้นเซ็นเซอร์ลายนิ้วมือ
+  finger.begin(57600);
+  
+  if (finger.verifyPassword()) {
+    Serial.println("พบเซ็นเซอร์ลายนิ้วมือ!");
+  } else {
+    Serial.println("ไม่พบเซ็นเซอร์ลายนิ้วมือ :(");
+    while (1) { delay(1); }
+  }
+
+  finger.getTemplateCount();
+  Serial.print("เซ็นเซอร์มี "); Serial.print(finger.templateCount); Serial.println(" เทมเพลต");
+}
+
+void loop() {
+  Serial.println("เริ่มกระบวนการบันทึกลายนิ้วมือ...");
+  enrollFingerprint();
+  delay(5000); // รอ 5 วินาทีก่อนวนลูปใหม่
+}
+
+void enrollFingerprint() {
+  uint8_t id;
+  Serial.println("กรุณาป้อนหมายเลข ID (1-127) สำหรับบันทึกลายนิ้วมือ:");
+  
+  while (!Serial.available()); // รอรับ ID จาก Serial Monitor
+  id = Serial.parseInt(); // อ่าน ID จาก Serial Monitor
+  Serial.print("บันทึกข้อมูลลายนิ้วมือสำหรับ ID #");
+  Serial.println(id);
+  
+  if (id == 0) { // ตรวจสอบว่า ID ต้องไม่ใช่ 0
+    Serial.println("ID #0 ไม่สามารถใช้ได้");
+    return;
+  }
+
+  // เรียกฟังก์ชันบันทึกลายนิ้วมือ
+  uint8_t result = getFingerprintEnroll(id);
+  if (result == FINGERPRINT_OK) {
+    Serial.println("ลายนิ้วมือถูกบันทึกเรียบร้อย!");
+  } else {
+    Serial.println("เกิดข้อผิดพลาดในการบันทึกลายนิ้วมือ");
+  }
+}
+
+uint8_t getFingerprintEnroll(uint8_t id) {
+  int p;
+
+  Serial.print("วางนิ้วบนเซ็นเซอร์เพื่อลงทะเบียน ID #");
+  Serial.println(id);
+
+  // ขั้นตอนที่ 1: ตรวจจับลายนิ้วมือครั้งแรก
+  while ((p = finger.getImage()) != FINGERPRINT_OK) {
+    if (p == FINGERPRINT_NOFINGER) {
+      Serial.print(".");
+    } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
+      Serial.println("ข้อผิดพลาดในการเชื่อมต่อ");
+    } else if (p == FINGERPRINT_IMAGEFAIL) {
+      Serial.println("ข้อผิดพลาดของภาพลายนิ้วมือ");
+    } else {
+      Serial.println("ข้อผิดพลาดที่ไม่ทราบสาเหตุ");
+    }
+    delay(500);
+  }
+  Serial.println("\nภาพลายนิ้วมือถูกจับสำเร็จ");
+
+  // ขั้นตอนที่ 2: แปลงภาพลายนิ้วมือครั้งแรก
+  p = finger.image2Tz(1);
+  if (p != FINGERPRINT_OK) {
+    Serial.println("ไม่สามารถแปลงภาพลายนิ้วมือครั้งแรกได้");
+    return p;
+  }
+  Serial.println("แปลงภาพลายนิ้วมือครั้งแรกสำเร็จ");
+
+  // ขั้นตอนที่ 3: รอให้นิ้วถูกนำออก
+  Serial.println("กรุณานำลายนิ้วมือออก");
+  delay(2000);
+  while ((p = finger.getImage()) != FINGERPRINT_NOFINGER);
+
+  // ขั้นตอนที่ 4: วางนิ้วอีกครั้ง
+  Serial.println("วางลายนิ้วมือเดิมอีกครั้ง");
+  while ((p = finger.getImage()) != FINGERPRINT_OK) {
+    if (p == FINGERPRINT_NOFINGER) {
+      Serial.print(".");
+    } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
+      Serial.println("ข้อผิดพลาดในการเชื่อมต่อ");
+    } else if (p == FINGERPRINT_IMAGEFAIL) {
+      Serial.println("ข้อผิดพลาดของภาพลายนิ้วมือ");
+    } else {
+      Serial.println("ข้อผิดพลาดที่ไม่ทราบสาเหตุ");
+    }
+    delay(500);
+  }
+  Serial.println("\nภาพลายนิ้วมือครั้งที่สองถูกจับสำเร็จ");
+
+  // ขั้นตอนที่ 5: แปลงภาพลายนิ้วมือครั้งที่สอง
+  p = finger.image2Tz(2);
+  if (p != FINGERPRINT_OK) {
+    Serial.println("ไม่สามารถแปลงภาพลายนิ้วมือครั้งที่สองได้");
+    return p;
+  }
+  Serial.println("แปลงภาพลายนิ้วมือครั้งที่สองสำเร็จ");
+
+  // ขั้นตอนที่ 6: สร้างโมเดลลายนิ้วมือ
+  p = finger.createModel();
+  if (p != FINGERPRINT_OK) {
+    if (p == FINGERPRINT_ENROLLMISMATCH) {
+      Serial.println("ลายนิ้วมือที่วางไม่ตรงกัน");
+    } else {
+      Serial.println("ไม่สามารถสร้างโมเดลลายนิ้วมือได้");
+    }
+    return p;
+  }
+  Serial.println("สร้างโมเดลลายนิ้วมือสำเร็จ");
+
+  // ขั้นตอนที่ 7: บันทึกโมเดลใน ID ที่กำหนด
+  p = finger.storeModel(id);
+  if (p == FINGERPRINT_OK) {
+    Serial.println("บันทึกลายนิ้วมือสำเร็จ!");
+    return FINGERPRINT_OK;
+  } else if (p == FINGERPRINT_BADLOCATION) {
+    Serial.println("ตำแหน่งที่เลือกไม่สามารถใช้ได้");
+  } else if (p == FINGERPRINT_FLASHERR) {
+    Serial.println("ข้อผิดพลาดในการบันทึกข้อมูลลงหน่วยความจำ");
+  } else {
+    Serial.println("ข้อผิดพลาดที่ไม่ทราบสาเหตุ");
+  }
+  return p;
+}

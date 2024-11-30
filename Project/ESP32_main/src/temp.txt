@@ -1,0 +1,33 @@
+#include <Arduino.h>
+#include <HardwareSerial.h>
+
+HardwareSerial espCamSerial(1); // ใช้ Serial1 สำหรับเชื่อมกับ ESP32-CAM
+#define RX_PIN 25                // Pin RX ของ ESP32 เชื่อมกับ TX ของ ESP32-CAM
+#define TX_PIN 26                // Pin TX ของ ESP32 เชื่อมกับ RX ของ ESP32-CAM
+
+void setup() {
+  Serial.begin(9600);           // Serial Monitor สำหรับ Debugging
+  espCamSerial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN); // ตั้งค่า Serial1
+
+  Serial.println("ESP32 Main Ready.");
+  delay(1000);
+
+  // สั่งให้ ESP32-CAM เริ่มทำงาน
+  espCamSerial.println("START");
+  delay(2000);
+  espCamSerial.println("STOP");
+  delay(2000);
+  espCamSerial.println("START");
+  delay(2000);
+  Serial.println("Sent START command to ESP32-CAM.");
+}
+
+void loop() {
+  // รับค่าจาก ESP32-CAM
+  if (espCamSerial.available()) {
+    String response = espCamSerial.readStringUntil('\n'); // อ่านค่าจนเจอ '\n'
+    response.trim(); // ลบช่องว่างด้านหน้าและด้านหลังออก
+    Serial.println(response);     
+  }
+
+}
